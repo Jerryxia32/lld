@@ -2394,7 +2394,7 @@ InputSection *ThunkSection::getTargetInputSection() const {
 
 template <class ELFT>
 CheriCapRelocsSection<ELFT>::CheriCapRelocsSection()
-    : SyntheticSection(SHF_ALLOC, SHT_PROGBITS, 8, "__cap_relocs") {
+    : SyntheticSection(SHF_ALLOC, SHT_PROGBITS, 4, "__cap_relocs") {
   this->Entsize = RelocSize;
 }
 
@@ -2552,7 +2552,7 @@ void elf::CheriCapRelocsSection<ELFT>::processSection(InputSectionBase *S) {
             toString(S) + ": " + Twine(LocationRel.r_addend));
       return;
     }
-    uint64_t CapRelocsOffset = LocationRel.r_offset;
+    uint32_t CapRelocsOffset = LocationRel.r_offset;
     assert(CapRelocsOffset + Entsize <= S->getSize());
     if (LocationRel.getType(Config->IsMips64EL) != R_MIPS_64) {
       error("Exptected a R_MIPS_64 relocation in __cap_relocs but got " +
@@ -2575,12 +2575,12 @@ void elf::CheriCapRelocsSection<ELFT>::processSection(InputSectionBase *S) {
 //    errs() << "Adding cap reloc at " << toString(LocationSym) << " type "
 //           << Twine((int)LocationSym.Type) << " against "
 //           << toString(TargetSym) << "\n";
-    const uint64_t LocationOffset = LocationRel.r_addend;
-    const uint64_t TargetOffset = TargetRel.r_addend;
+    const uint32_t LocationOffset = LocationRel.r_addend;
+    const uint32_t TargetOffset = TargetRel.r_addend;
     auto *RawInput = reinterpret_cast<const InMemoryCapRelocEntry<E>*>(
             S->Data.begin() + CapRelocsOffset);
     bool LocNeedsDynReloc = false;
-    std::pair<DefinedRegular*, uint64_t> RealLocation;
+    std::pair<DefinedRegular*, uint32_t> RealLocation;
     InputSectionBase* SourceSection = nullptr; // the section where the symbol needing a cap_reloc is defined
     // TODO: just assume this is the way it has to be and error out otherwise to remove all the if statements
     if (DefinedRegular* DefinedLocation = dyn_cast<DefinedRegular>(LocationSym)) {
@@ -2693,32 +2693,32 @@ template <class ELFT>
 void CheriCapRelocsSection<ELFT>::writeTo(uint8_t *Buf) {
   constexpr endianness E = ELFT::TargetEndianness;
   static_assert(RelocSize == sizeof(InMemoryCapRelocEntry<E>), "cap relocs size mismatch");
-  uint64_t Offset = 0;
+  uint32_t Offset = 0;
   for (const auto &I : RelocsMap) {
     const CheriCapRelocLocation& Location = I.first;
     const CheriCapReloc& Reloc = I.second;
     SymbolBody *LocationSym = Location.BaseSym;
-    int64_t LocationOffset = Location.Offset;
+    int32_t LocationOffset = Location.Offset;
     // If we don't need a dynamic relocation just write the VA
     // We always write the virtual address here:
     // In the shared library case this will be an address relative to the load
     // address and will be handled by crt_init_globals. In the static case we
     // can compute the final virtual address
-    uint64_t LocationVA = LocationSym->getVA(LocationOffset);
+    uint32_t LocationVA = LocationSym->getVA(LocationOffset);
     // For the target the virtual address the addend is always zero so
     // if we need a dynamic reloc we write zero
     // TODO: would it be more efficient for local symbols to write the DSO VA
     // and add a relocation against the load address?
     // Also this would make llvm-objdump -C more useful because it would
     // actually display the symbol that the relocation is against
-    uint64_t TargetVA = Reloc.Target->getVA(Reloc.TargetSymbolOffset);
+    uint32_t TargetVA = Reloc.Target->getVA(Reloc.TargetSymbolOffset);
     if (Reloc.NeedsDynReloc && Reloc.Target->isPreemptible()) {
       // If we have a relocation against a preemptible symbol (even in the current DSO)
       // we can't compute the virtual address here so we only write the addend
       TargetVA = Reloc.TargetSymbolOffset;
     }
-    uint64_t TargetOffset = Reloc.Offset;
-    uint64_t TargetSize = Reloc.Target->template getSize<ELFT>();
+    uint32_t TargetOffset = Reloc.Offset;
+    uint32_t TargetSize = Reloc.Target->template getSize<ELFT>();
     if (TargetSize == 0) {
       bool WarnAboutUnknownSize = true;
       // currently clang doesn't emit the necessary symbol information for local string constants such as:
@@ -2737,7 +2737,7 @@ void CheriCapRelocsSection<ELFT>::writeTo(uint8_t *Buf) {
       }
       if (OutputSection* OS = Reloc.Target->getOutputSection()) {
         assert(TargetVA >= OS->Addr);
-        uint64_t OffsetInOS = TargetVA - OS->Addr;
+        uint32_t OffsetInOS = TargetVA - OS->Addr;
         assert(OffsetInOS < OS->Size);
         TargetSize = OS->Size - OffsetInOS;
 #if 0
@@ -2749,11 +2749,11 @@ void CheriCapRelocsSection<ELFT>::writeTo(uint8_t *Buf) {
       } else {
         warn("Could not find size for symbol '" + toString(*Reloc.Target) +
              "' and could not determine section size. Using UINT64_MAX.");
-        TargetSize = std::numeric_limits<uint64_t>::max();
+        TargetSize = std::numeric_limits<uint32_t>::max();
       }
     }
     assert(TargetOffset <= TargetSize);
-    uint64_t Permissions = Reloc.Target->isFunc() ? 1ULL << 63 : 0;
+    uint32_t Permissions = Reloc.Target->isFunc() ? 1U << 31 : 0;
     InMemoryCapRelocEntry<E> Entry { LocationVA, TargetVA, TargetOffset, TargetSize, Permissions };
     memcpy(Buf + Offset, &Entry, sizeof(Entry));
 //     if (Config->Verbose) {

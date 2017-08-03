@@ -829,14 +829,14 @@ private:
 // See CheriBSD crt_init_globals()
 template<llvm::support::endianness E>
 struct InMemoryCapRelocEntry {
-  using CapRelocUint64 = llvm::support::detail::packed_endian_specific_integral<uint64_t, E, llvm::support::aligned>;
-  InMemoryCapRelocEntry(uint64_t Loc, uint64_t Obj, uint64_t Off, uint64_t S, uint64_t Perms)
+  using CapRelocUint32 = llvm::support::detail::packed_endian_specific_integral<uint32_t, E, llvm::support::aligned>;
+  InMemoryCapRelocEntry(uint32_t Loc, uint32_t Obj, uint32_t Off, uint32_t S, uint32_t Perms)
     : capability_location(Loc), object(Obj), offset(Off), size(S), permissions(Perms) {}
-  CapRelocUint64 capability_location;
-  CapRelocUint64 object;
-  CapRelocUint64 offset;
-  CapRelocUint64 size;
-  CapRelocUint64 permissions;
+  CapRelocUint32 capability_location;
+  CapRelocUint32 object;
+  CapRelocUint32 offset;
+  CapRelocUint32 size;
+  CapRelocUint32 permissions;
 };
 
 
@@ -862,7 +862,7 @@ template <class ELFT>
 class CheriCapRelocsSection : public SyntheticSection {
 public:
   CheriCapRelocsSection();
-  static constexpr size_t RelocSize = 40;
+  static constexpr size_t RelocSize = 20;
   // Add a __cap_relocs section from in input object file
   void addSection(InputSectionBase *S);
   size_t getSize() const override { return RelocsMap.size() * Entsize; }
