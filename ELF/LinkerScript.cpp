@@ -112,13 +112,6 @@ uint64_t LinkerScript::getOutputSectionSize(StringRef Name) {
 
 void LinkerScript::setDot(Expr E, const Twine &Loc, bool InSec) {
   uint64_t Val = E().getValue();
-  if (Val < Dot) {
-    if (InSec)
-      error(Loc + ": unable to move location counter backward for: " +
-            CurOutSec->Name);
-    else
-      error(Loc + ": unable to move location counter backward");
-  }
   Dot = Val;
   // Update to location counter means update to section size.
   if (InSec)
